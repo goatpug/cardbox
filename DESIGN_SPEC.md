@@ -46,7 +46,9 @@ It deliberately avoids prescribing visual design beyond layout requirements.
 
 ### 1.3 Non-goals (v1)
 
-- No accounts, no persistence between game nights beyond saved card packs.
+- No accounts. The only durable data is the card library (§6.4) — custom
+  cards persist across game nights automatically so nobody writes a card
+  twice, but there are no profiles, logins, or per-player stats.
 - No matchmaking, no multiple simultaneous public games discovery (the server
   *does* support multiple concurrent rooms, but they're joined by code only).
 - No in-app audio/video chat — Discord handles all voice.
@@ -81,16 +83,25 @@ Notes:
 
 - **Python 3.12+**, **FastAPI** + **uvicorn**, using FastAPI's native
   WebSocket support. Single process, single event loop (asyncio).
-- All game state is **in-memory** (a dict of `Room` objects). No database.
-  A crashed server means a lost game night in the worst case; see §8.6 for a
-  cheap snapshot mitigation.
-- Card packs (base deck + saved custom packs) are **JSON files on disk**
-  loaded at startup (§6.4).
+- State is split by lifetime:
+  - **Live room state is in-memory** (a dict of `Room` objects): phases,
+    hands, scores, submissions. Games are ephemeral, so a crashed server
+    means a lost game night in the worst case; see §8.6 for a cheap
+    snapshot mitigation.
+  - **The card library is persistent — SQLite** (stdlib `sqlite3`, one
+    `cardbox.db` file, no database server). Every custom card is written to
+    the library the moment a player adds it (§5.6), so custom cards survive
+    server restarts and accumulate across game nights. Nobody ever writes a
+    card twice.
+- Starter/base packs ship as **JSON files** and are importable into the
+  library; the library can also export any pack back to JSON (§6.4).
 - The same FastAPI app serves the static frontend files, so the whole game is
   one process: `uvicorn cardbox.app:app`.
 
 Why: a party game for ~4–10 friends needs no horizontal scaling, no job
-queues, and no ORM. One asyncio process comfortably handles dozens of rooms.
+queues, no ORM, and no database *server* — SQLite is a file and the stdlib
+driver, which keeps deployment one process while making the card collection
+durable. One asyncio process comfortably handles dozens of rooms.
 The game logic (deck, rounds, scoring, state machine) must be written as a
 **pure-Python module with no I/O or FastAPI imports**, so it can be unit
 tested without a server (§9).
@@ -121,6 +132,12 @@ Acceptable options (builder should document at least one in the README):
 HTTPS matters: phone browsers throttle/kill background tabs aggressively, and
 some WebSocket + wake-lock behaviors are HTTPS-only. Assume **wss://** in
 production.
+
+**Persistence caveat**: `cardbox.db` holds the group's accumulated card
+library, so it must live on a disk that survives redeploys — a persistent
+volume on a PaaS, or just the home directory on a VPS/local machine. Free
+tiers with ephemeral filesystems silently wipe it; the README must call this
+out, and the export-to-JSON path (§6.4) doubles as the backup mechanism.
 
 ---
 
@@ -247,16 +264,23 @@ Reachable any time from a persistent "＋ Cards" button in the player UI.
   server rejects a black card with no `_` and no `?`). `pick` is derived:
   number of `_` occurrences, or 1 for a question card (§6.2). Live preview
   renders blanks as the styled underline players will see.
-- On submit: card is added to the room's active deck. New white cards go
-  into the draw pile (shuffled in); new black cards likewise. The Board
-  briefly toasts "Dana added 2 custom cards" — count only, never the text,
-  so custom cards stay surprising.
-- Cards added mid-round join the piles immediately but naturally can't
-  appear until drawn.
-- **Pack saving**: the room's custom cards are exportable from the Board
-  ("Save custom pack" → server writes a JSON pack file, §6.4) so a group's
-  house deck accumulates across game nights and appears as a toggleable pack
-  in the next lobby.
+- On submit, the card goes two places at once:
+  1. The room's active deck — new cards are shuffled into the draw piles
+     immediately (they naturally can't appear until drawn).
+  2. The persistent **card library** (§6.4), written synchronously with the
+     author's player name attached. There is no "save" step and nothing to
+     remember — every card ever written is already in the House pack next
+     game night.
+- The Board briefly toasts "Dana added 2 custom cards" — count only, never
+  the text, so custom cards stay surprising.
+- **The House pack**: all library-persisted custom cards form a pack named
+  "House" that appears alongside the starter packs in every future lobby,
+  toggleable like any other pack (on by default).
+- **Library management** (Board, lobby only): a "Card library" panel lists
+  House cards with text + author, with per-card delete — the group will
+  eventually want to prune a dud or a duplicate. Deletes are soft (§6.4);
+  a deleted card stops appearing in future decks but an in-flight copy in
+  the current room plays out normally.
 
 ---
 
@@ -316,7 +340,41 @@ Submission
   revealed: bool
 ```
 
-### 6.4 Card packs (on disk)
+### 6.4 The card library (SQLite)
+
+The single durable store. One file, `cardbox.db`, stdlib `sqlite3`:
+
+```sql
+CREATE TABLE packs (
+  id         TEXT PRIMARY KEY,   -- 'base', 'house', 'custom-…'
+  name       TEXT NOT NULL,
+  on_by_default INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE cards (
+  id         INTEGER PRIMARY KEY,
+  kind       TEXT NOT NULL CHECK (kind IN ('white','black')),
+  text       TEXT NOT NULL,
+  pick       INTEGER NOT NULL DEFAULT 1,  -- derived at insert (§6.2)
+  author     TEXT,                        -- player name; NULL for shipped packs
+  pack_id    TEXT NOT NULL REFERENCES packs(id),
+  created_at TEXT NOT NULL,
+  deleted    INTEGER NOT NULL DEFAULT 0   -- soft delete (§5.6)
+);
+```
+
+- Custom cards are inserted into pack `house` **at the moment of creation**
+  (§5.6) — persistence is automatic, never a user action.
+- Writes are tiny and rare (a card at a time), so plain synchronous
+  `sqlite3` calls are fine inside the async app; no aiosqlite needed.
+- At room creation, the enabled packs' non-deleted cards are copied into the
+  room's in-memory draw piles; the game never touches the DB mid-round
+  except for `add_card` inserts.
+- Duplicate guard: inserting a card whose normalized text (case-folded,
+  whitespace-collapsed) already exists non-deleted in the library is a
+  no-op that still shuffles the existing card into the current room —
+  friends *will* re-type the same joke.
+
+**JSON packs (import/export)** remain the interchange format:
 
 ```json
 {
@@ -327,9 +385,10 @@ Submission
 }
 ```
 
-- `packs/` directory, one JSON file per pack, loaded at startup; the lobby
-  lists all packs with toggles. "Save custom pack" (§5.6) writes
-  `packs/custom-<date>.json`.
+- `packs/*.json` are seeded into the DB at startup (insert-if-absent by pack
+  id, so editing shipped files stays possible).
+- The Board's library panel offers "Export pack → JSON" — this is also the
+  backup story for `cardbox.db` (§3.3).
 - Ship a small original starter pack (~150 white / ~40 black). **Do not copy
   official CAH card text** — CAH is CC BY-NC-SA, which is incompatible with
   redistribution here without matching license care; original cards written
@@ -491,8 +550,9 @@ requirement, not a suggestion.
 
 - Codes: 4 letters from a 24-letter alphabet (no O/I) → ~330k combinations;
   collision-checked at creation. Rooms are garbage-collected after 60
-  minutes with no connected clients. GC writes nothing; saved packs (§6.4)
-  are the only persistence that outlives a room.
+  minutes with no connected clients. GC has nothing it needs to save —
+  custom cards were already persisted to the library at creation time
+  (§5.6), so a dead room loses scores and hands, never cards.
 
 ---
 
@@ -508,6 +568,10 @@ The game logic module (no I/O, §3.1) must have unit tests covering at least:
   (§6.5).
 - Black card parsing: blank counting → `pick`, question detection,
   rejection of blank-less non-questions (§5.6).
+- Card library round-trip (§6.4): `add_card` → restart-simulating reload →
+  card present in the next room's deck; soft delete excludes a card from new
+  rooms without touching an in-flight one; duplicate-text insert is a no-op;
+  JSON pack import/export round-trips.
 - **Serializer filtering (§7.3): board/player/czar snapshots must never
   contain another player's hand, any token, or a submission→player mapping
   pre-winner.** Treat a leak here as a broken build.
@@ -529,7 +593,8 @@ cardbox/
       app.py          # FastAPI app: routes, websockets, static files
       game.py         # pure game logic: Room, phases, decks, rules
       serialize.py    # role-filtered snapshot builders (§7.3)
-      cards.py        # pack loading/saving, black-card parsing
+      cards.py        # black-card parsing, pack import/export
+      library.py      # SQLite card library: schema, inserts, soft delete (§6.4)
     tests/
   web/
     index.html        # landing
@@ -538,7 +603,8 @@ cardbox/
     shared/ws.js      # envelope + heartbeat + reconnect
     style.css
   packs/
-    base.json
+    base.json         # shipped JSON packs, seeded into the DB at startup
+  cardbox.db          # created at first run; the persistent card library
   DESIGN_SPEC.md      # this file
 ```
 
@@ -552,6 +618,7 @@ cardbox/
    hardcoded base pack. *(First real game night possible here.)*
 4. **The full loop**: scores/game over/rematch, Czar order editor, settings,
    late join, disconnect handling (§8.1–8.5).
-5. **Custom cards**: editor, validation, mid-game insertion, pack save/load.
+5. **Custom cards**: editor, validation, mid-game insertion, the SQLite
+   library with auto-persist + House pack, library panel, JSON import/export.
 6. **Polish**: QR join, reveal animations, timers, room GC, snapshots (§8.6),
    720p legibility pass on the Board.
