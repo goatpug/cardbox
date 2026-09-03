@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cardbox — Board</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div id="toast-host"></div>
+
+  <div id="taken-over" class="full-screen-msg hidden">
+    <h1>Board opened elsewhere</h1>
+    <p class="muted">This Board window has been replaced by another one on the same room.</p>
+  </div>
+
+  <div id="board" class="board hidden">
+    <header class="board-header">
+      <div class="room-code" id="room-code">----</div>
+      <div class="qr-wrap"><div id="qr"></div></div>
+      <div class="col" style="gap:0.1em">
+        <span class="muted">Join at</span>
+        <strong id="join-url">-</strong>
+      </div>
+      <div class="spacer"></div>
+      <div id="round-badge" class="badge hidden">Round <span id="round-no">1</span></div>
+    </header>
+
+    <main class="board-main">
+      <!-- LOBBY -->
+      <section id="view-lobby" class="col hidden">
+        <div class="panel">
+          <div class="row" style="justify-content:space-between">
+            <h2>Players</h2>
+            <span class="muted" id="player-count">0 joined</span>
+          </div>
+          <div id="lobby-players" class="scoreboard"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Card Czar order</h2>
+          <p class="muted">Drag to reorder, or use the arrows. Takes effect from the next round.</p>
+          <div id="czar-order-editor" class="czar-order-list"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Settings</h2>
+          <div class="settings-grid">
+            <label>Hand size
+              <select id="setting-hand-size"></select>
+            </label>
+            <label>Score target
+              <select id="setting-score-target"></select>
+            </label>
+            <label>Czar pick timer
+              <select id="setting-czar-timer"></select>
+            </label>
+            <label>Submission timer
+              <select id="setting-submission-timer"></select>
+            </label>
+          </div>
+          <h3 style="margin-top:1em">Card packs</h3>
+          <div id="pack-toggles" class="pack-toggle-list"></div>
+        </div>
+
+        <div class="panel">
+          <div class="row" style="justify-content:space-between">
+            <h2>Card library</h2>
+            <a id="export-house" href="/api/library/packs/house/export"><button class="secondary icon">⇩ Export House</button></a>
+          </div>
+          <div id="library-list" class="library-list"></div>
+        </div>
+
+        <button id="btn-start-game" class="big" disabled>Start game (need 3+ players)</button>
+      </section>
+
+      <!-- IN ROUND -->
+      <section id="view-round" class="col hidden">
+        <div class="status-line" id="status-line"></div>
+        <div id="deck-warning" class="badge hidden" style="background:var(--warn);color:#221;"></div>
+        <div class="black-card-display">
+          <div class="card black">
+            <div class="card-text" id="black-card-text"></div>
+            <div class="card-foot">Pick <span id="black-card-pick"></span></div>
+          </div>
+        </div>
+        <div class="submission-grid" id="submission-grid"></div>
+        <div class="row">
+          <button id="btn-skip-czar" class="danger hidden">Skip Czar (round stuck)</button>
+        </div>
+      </section>
+
+      <!-- ROUND END -->
+      <section id="view-round-end" class="col hidden">
+        <div class="panel center">
+          <h2 id="winner-heading">Winner!</h2>
+          <div class="submission-grid" id="winner-card-grid" style="justify-content:center"></div>
+          <button id="btn-next-round" style="margin-top:1em">Next round now</button>
+        </div>
+      </section>
+
+      <!-- GAME OVER -->
+      <section id="view-game-over" class="col hidden">
+        <div class="panel center">
+          <h2>🏆 Game over</h2>
+          <div id="final-standings" class="scoreboard" style="max-width:24em;margin:0 auto"></div>
+          <button id="btn-rematch" style="margin-top:1em" class="big">Rematch</button>
+        </div>
+      </section>
+    </main>
+
+    <aside class="board-sidebar">
+      <div class="panel">
+        <h2>Scoreboard</h2>
+        <div id="scoreboard" class="scoreboard"></div>
+      </div>
+      <div class="panel" id="czar-preview-panel">
+        <h2>Czar</h2>
+        <p id="czar-preview" class="muted"></p>
+      </div>
+    </aside>
+  </div>
+
+  <script src="/static/shared/qrcode.js"></script>
+  <script type="module" src="/static/board.js"></script>
+</body>
+</html>

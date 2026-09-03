@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Cardbox — Play</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div id="toast-host"></div>
+  <div id="board-disconnected" class="badge hidden" style="position:fixed;top:0.6em;left:50%;transform:translateX(-50%);z-index:150;background:var(--danger);color:white;">
+    Board disconnected
+  </div>
+
+  <!-- JOIN -->
+  <div id="screen-join" class="join-screen">
+    <h1>🃏 Cardbox</h1>
+    <div class="col">
+      <label class="muted">Room code
+        <input id="join-code" type="text" maxlength="4" placeholder="ABCD" autocapitalize="characters" />
+      </label>
+      <label class="muted">Your name
+        <input id="join-name" type="text" maxlength="20" placeholder="Your name" />
+      </label>
+      <div id="join-error" class="muted hidden" style="color:var(--danger)"></div>
+      <button id="btn-join" class="big">Join game</button>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="screen-app" class="player-app hidden">
+    <header class="player-header">
+      <div class="meta">
+        <span id="phase-status">-</span>
+        <span id="timer-pill" class="timer-pill hidden"></span>
+      </div>
+      <div class="card black">
+        <div class="card-text" id="header-black-text"></div>
+      </div>
+    </header>
+
+    <main class="hand-area" id="hand-area"></main>
+
+    <div id="confirm-bar" class="confirm-bar hidden">
+      <span class="muted grow" id="confirm-hint"></span>
+      <button id="btn-confirm" disabled>Confirm</button>
+    </div>
+
+    <button id="btn-open-editor" class="fab secondary">＋ Cards</button>
+  </div>
+
+  <!-- KICKED -->
+  <div id="screen-kicked" class="full-screen-msg hidden">
+    <h1>You've been removed</h1>
+    <p class="muted">The host removed you from this game.</p>
+  </div>
+
+  <!-- CARD EDITOR -->
+  <div id="editor-sheet" class="editor-sheet hidden">
+    <div class="sheet-body">
+      <div class="row" style="justify-content:space-between">
+        <h2>Add a custom card</h2>
+        <button class="ghost icon" id="editor-close">✕</button>
+      </div>
+      <div class="editor-tabs">
+        <button id="tab-white" class="active">White card</button>
+        <button id="tab-black">Black card</button>
+      </div>
+
+      <div id="editor-white">
+        <p class="muted">Write a noun or gerund — a thing or a doing. "A disappointing salad." "Crying at the gym."</p>
+        <textarea id="white-text" maxlength="80" rows="2" style="width:100%;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:0.7em;"></textarea>
+        <div class="char-count"><span id="white-count">0</span>/80</div>
+        <div class="preview-card"><div class="card white"><div class="card-text" id="white-preview"></div></div></div>
+        <button id="btn-add-white" class="big">Add white card</button>
+      </div>
+
+      <div id="editor-black" class="hidden">
+        <p class="muted">Fill-in-the-blank ("_ ruined Thanksgiving.") or a question ("What's my secret power?").</p>
+        <textarea id="black-text" maxlength="140" rows="2" style="width:100%;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:0.7em;"></textarea>
+        <div class="char-count"><span id="black-count">0</span>/140</div>
+        <div class="preview-card"><div class="card black"><div class="card-text" id="black-preview"></div></div></div>
+        <button id="btn-add-black" class="big">Add black card</button>
+      </div>
+
+      <div id="editor-error" class="hidden" style="color:var(--danger)"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/static/play.js"></script>
+</body>
+</html>

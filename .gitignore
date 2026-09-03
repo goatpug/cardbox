@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Cardbox-specific
+cardbox.db
+snapshots/
+server/.venv/
+
