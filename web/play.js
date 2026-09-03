@@ -269,7 +269,11 @@ function renderRevealing(you, area, bar) {
       card.innerHTML = `<div class="card-text">${composeSentence(bc.text, entry.cards)}</div>`;
     } else {
       card.className = "card facedown";
-      if (you.is_czar && you.reveal_cursor === i) card.style.outline = "2px dashed var(--accent)";
+      if (you.is_czar && you.reveal_cursor === i) {
+        card.style.outline = "2px dashed var(--accent)";
+        card.style.cursor = "pointer";
+        card.addEventListener("click", () => socket.send("reveal_next", {}));
+      }
     }
     grid.appendChild(card);
   });
@@ -277,7 +281,7 @@ function renderRevealing(you, area, bar) {
 
   if (you.is_czar) {
     bar.classList.remove("hidden");
-    document.getElementById("confirm-hint").textContent = "Flip the next card";
+    document.getElementById("confirm-hint").textContent = "Tap the next card, or:";
     const btn = document.getElementById("btn-confirm");
     btn.disabled = you.reveal_cursor === null || you.reveal_cursor === undefined;
     btn.textContent = "Flip next";
