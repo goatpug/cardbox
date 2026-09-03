@@ -1,5 +1,5 @@
 import { GameSocket } from "/static/shared/ws.js";
-import { esc, renderBlankTemplate, composeSentence } from "/static/shared/cardview.js";
+import { esc, renderBlankTemplate, renderSubmission } from "/static/shared/cardview.js";
 
 const SESSION_KEY = "cardbox_session";
 
@@ -265,8 +265,9 @@ function renderRevealing(you, area, bar) {
   state.revealed.forEach((entry, i) => {
     const card = document.createElement("div");
     if (entry.revealed) {
-      card.className = "card black";
-      card.innerHTML = `<div class="card-text">${composeSentence(bc.text, entry.cards)}</div>`;
+      const { className, html } = renderSubmission(bc.text, entry.cards);
+      card.className = className;
+      card.innerHTML = html;
     } else {
       card.className = "card facedown";
       if (you.is_czar && you.reveal_cursor === i) {
@@ -296,8 +297,9 @@ function renderJudging(you, area, bar) {
   grid.style.gridTemplateColumns = "1fr";
   state.revealed.forEach((entry, i) => {
     const card = document.createElement("div");
-    card.className = "card black" + (pendingWinnerIndex === i ? " selected" : "");
-    card.innerHTML = `<div class="card-text">${composeSentence(bc?.text || "", entry.cards)}</div>`;
+    const { className, html } = renderSubmission(bc?.text || "", entry.cards);
+    card.className = className + (pendingWinnerIndex === i ? " selected" : "");
+    card.innerHTML = html;
     if (you.can_judge) {
       card.addEventListener("click", () => {
         pendingWinnerIndex = i;
@@ -328,12 +330,11 @@ function renderRoundEnd(area) {
   area.innerHTML = `<div class="full-screen-msg" style="min-height:30vh"><h2>${esc(w.name)} won with:</h2></div>`;
   const grid = document.createElement("div");
   grid.className = "hand-grid";
-  for (const c of w.cards) {
-    const card = document.createElement("div");
-    card.className = "card white";
-    card.innerHTML = `<div class="card-text">${esc(c.text)}</div>`;
-    grid.appendChild(card);
-  }
+  const card = document.createElement("div");
+  const { className, html } = renderSubmission(w.black_card_text, w.cards);
+  card.className = className;
+  card.innerHTML = html;
+  grid.appendChild(card);
   area.appendChild(grid);
 }
 

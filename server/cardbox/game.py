@@ -407,7 +407,12 @@ class Room:
         sub = self.submissions[submission_index]
         winner = self.get_player(sub.player_id)
         winner.score += 1
-        self.last_winner = {"player_id": winner.id, "name": winner.name, "cards": sub.cards}
+        self.last_winner = {
+            "player_id": winner.id,
+            "name": winner.name,
+            "cards": sub.cards,
+            "black_card_text": self.black_card.text if self.black_card else "",
+        }
         for s in self.submissions:
             self.decks.white_discard.extend(s.cards)
         if self.black_card is not None:

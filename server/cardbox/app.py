@@ -398,6 +398,11 @@ async def play_page_with_code(code: str):
     return FileResponse(WEB_DIR / "play.html")
 
 
+@app.get("/admin")
+async def admin_page():
+    return FileResponse(WEB_DIR / "admin.html")
+
+
 # ----------------------------------------------------------- library REST API
 # (Board-only, lobby-only per §5.6; not part of the §7.4 realtime protocol.)
 

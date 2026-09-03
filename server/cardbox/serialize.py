@@ -62,6 +62,7 @@ def _base_snapshot(room: Room) -> dict:
         winner = {
             "name": room.last_winner["name"],
             "cards": [_card_dict(c) for c in room.last_winner["cards"]],
+            "black_card_text": room.last_winner["black_card_text"],
         }
     return {
         "code": room.code,

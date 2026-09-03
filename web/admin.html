@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Cardbox — Card Library Admin</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div style="max-width:40em;margin:0 auto;padding:1.5em;">
+    <h1>🗃 Card Library</h1>
+    <p class="muted">
+      Not part of the shared Board — safe to keep open in its own tab without
+      spoiling anything on screen. Manage packs, prune duds, and export
+      backups here.
+    </p>
+
+    <div class="panel" style="margin-top:1em">
+      <h2>Packs</h2>
+      <div id="pack-list" class="library-list"></div>
+    </div>
+
+    <div class="panel" style="margin-top:1em">
+      <div class="row" style="justify-content:space-between">
+        <h2 id="cards-heading">Cards</h2>
+      </div>
+      <div id="card-list" class="library-list"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/static/admin.js"></script>
+</body>
+</html>

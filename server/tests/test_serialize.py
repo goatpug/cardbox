@@ -87,9 +87,14 @@ def test_winner_identity_only_appears_after_pick_winner():
     board_before = serialize_board(room)
     assert board_before["winner"] is None
 
+    black_text_before_cleanup = room.black_card.text
     room.pick_winner(czar_id, 0)
     board_after = serialize_board(room)
     assert board_after["winner"]["name"] == room.get_player(room.last_winner["player_id"]).name
+    # the black card text is preserved for the winner display even though
+    # room.black_card itself is cleared during cleanup (§4.2 step 5)
+    assert room.black_card is None
+    assert board_after["winner"]["black_card_text"] == black_text_before_cleanup
 
 
 def test_czar_gets_reveal_cursor_and_judge_flag():

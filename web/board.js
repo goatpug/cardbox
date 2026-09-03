@@ -1,5 +1,5 @@
 import { GameSocket } from "/static/shared/ws.js";
-import { esc, renderBlankTemplate, composeSentence } from "/static/shared/cardview.js";
+import { esc, renderBlankTemplate, renderSubmission } from "/static/shared/cardview.js";
 
 const HAND_SIZE_OPTIONS = [5, 6, 7, 8, 9, 10];
 const SCORE_TARGET_OPTIONS = [3, 5, 7, 10, 15, 20, "endless"];
@@ -274,7 +274,6 @@ async function loadLibrary() {
     const res = await fetch("/api/library/packs");
     packsMeta = await res.json();
     renderPackToggles();
-    renderLibraryList();
   } catch {
     /* offline-ish; ignore */
   }
@@ -302,40 +301,6 @@ function renderPackToggles() {
   });
 }
 
-function renderLibraryList() {
-  const houseMeta = packsMeta.find((p) => p.id === "house");
-  const el = document.getElementById("library-list");
-  if (!houseMeta) {
-    el.innerHTML = '<p class="muted">No custom cards yet.</p>';
-    return;
-  }
-  fetch("/api/library/packs/house/cards")
-    .then((r) => r.json())
-    .then((cards) => {
-      el.innerHTML = "";
-      if (!cards.length) {
-        el.innerHTML = '<p class="muted">No custom cards yet.</p>';
-        return;
-      }
-      for (const c of cards) {
-        const row = document.createElement("div");
-        row.className = "lib-row";
-        row.innerHTML = `
-          <span class="badge">${c.kind === "black" ? "⬛" : "⬜"}</span>
-          <span class="text">${esc(c.text)} <span class="author">— ${esc(c.author || "?")}</span></span>
-          <button class="ghost icon" data-del="${c.id}">🗑</button>
-        `;
-        el.appendChild(row);
-      }
-      el.querySelectorAll("[data-del]").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          await fetch(`/api/library/cards/${btn.dataset.del}`, { method: "DELETE" });
-          renderLibraryList();
-        });
-      });
-    });
-}
-
 document.getElementById("btn-start-game").addEventListener("click", () => socket.send("start_game", {}));
 
 // --------------------------------------------------------------------- round
@@ -358,9 +323,9 @@ function renderRound() {
   if (state.phase === "SUBMITTING") {
     statusEl.textContent = `Waiting for submissions… (${state.submission_count}/${nonCzarCount})`;
   } else if (state.phase === "REVEALING") {
-    statusEl.textContent = "Czar is revealing…";
+    statusEl.textContent = "Czar is revealing from their phone…";
   } else if (state.phase === "JUDGING") {
-    statusEl.textContent = "Czar is choosing a winner…";
+    statusEl.textContent = "Czar is choosing a winner on their phone…";
   }
 
   const grid = document.getElementById("submission-grid");
@@ -375,8 +340,9 @@ function renderRound() {
     for (const entry of state.revealed) {
       const card = document.createElement("div");
       if (entry.revealed) {
-        card.className = "card black";
-        card.innerHTML = `<div class="card-text">${composeSentence(bc.text, entry.cards)}</div>`;
+        const { className, html } = renderSubmission(bc.text, entry.cards);
+        card.className = className;
+        card.innerHTML = html;
       } else {
         card.className = "card facedown";
       }
@@ -396,18 +362,11 @@ function renderRoundEnd() {
   document.getElementById("winner-heading").textContent = w ? `${w.name} won the round!` : "Round over";
   const grid = document.getElementById("winner-card-grid");
   grid.innerHTML = "";
-  if (w && state.black_card === null) {
-    // black card already cleared server-side after cleanup; fall back to plain cards
-    for (const c of w.cards) {
-      const card = document.createElement("div");
-      card.className = "card white";
-      card.innerHTML = `<div class="card-text">${esc(c.text)}</div>`;
-      grid.appendChild(card);
-    }
-  } else if (w) {
+  if (w) {
     const card = document.createElement("div");
-    card.className = "card black";
-    card.innerHTML = `<div class="card-text">${composeSentence(state.black_card?.text || "", w.cards)}</div>`;
+    const { className, html } = renderSubmission(w.black_card_text, w.cards);
+    card.className = className;
+    card.innerHTML = html;
     grid.appendChild(card);
   }
 }
