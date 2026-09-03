@@ -1,0 +1,10 @@
+**/__pycache__/
+**/*.pyc
+server/.venv/
+server/tests/
+.git/
+.gitignore
+cardbox.db
+snapshots/
+*.md
+LICENSE

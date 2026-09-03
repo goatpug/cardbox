@@ -57,6 +57,50 @@ under "Card library" for the House pack (and the `/api/library/packs/{id}/export
 endpoint for any pack) — use it as a backup before redeploying somewhere
 without persistent storage.
 
+## Running with Docker
+
+A `Dockerfile` is included; it needs no code changes and works the same
+locally or on a host. The card library and crash snapshots are read from
+`/data` inside the container (via `CARDBOX_DB_PATH`/`CARDBOX_SNAPSHOT_DIR`),
+so persistence is just "mount a volume at `/data`":
+
+```bash
+docker build -t cardbox .
+docker volume create cardbox_data
+docker run -d --name cardbox -p 8420:8420 -v cardbox_data:/data cardbox
+```
+
+Then open `http://localhost:8420/` same as the Quickstart above. The named
+volume (`cardbox_data`) is what makes `cardbox.db` survive
+`docker rm`/rebuild/redeploy — without `-v ...:/data` the library resets
+every time the container restarts.
+
+This works fine on a Chromebook's Linux (Crostini) container — if Docker
+isn't installed yet: `sudo apt install docker.io`, then
+`sudo usermod -aG docker $USER` and restart the Linux VM (or just prefix
+commands with `sudo`, as above) so you don't need `sudo` for every command.
+
+## Deploying with a fixed URL (Northflank)
+
+A tunnel (`cloudflared`/`ngrok`) is fine for one-off game nights, but the
+URL is different every time you start it — annoying to re-share with the
+same group repeatedly. For a stable link (closer to how `jackbox.tv`
+behaves), deploy the container to a host that keeps it running continuously
+with a fixed address. [Northflank](https://northflank.com) works well for
+this and its free tier supports both persistent volumes and long-lived
+WebSocket connections (many serverless/functions-style free tiers support
+neither, which is why they don't work for Cardbox):
+
+1. Push this repo to GitHub (if it isn't already) and connect it as a
+   Northflank service — it will build straight from the root `Dockerfile`.
+2. Set the service's port to `8420`.
+3. Add a **persistent volume** mounted at `/data` (matches the Dockerfile's
+   `CARDBOX_DB_PATH`/`CARDBOX_SNAPSHOT_DIR`) — without this the card library
+   resets on every redeploy.
+4. Northflank gives the service a stable `https://...northflank.app` URL
+   (or attach your own domain) — that's what you share with your group once,
+   and it stays the same for every future game night.
+
 ## Running the tests
 
 ```bash
@@ -73,6 +117,8 @@ a full round driven over the real WebSocket transport.
 ## Repository layout
 
 ```
+Dockerfile
+.dockerignore
 server/
   cardbox/
     app.py          # FastAPI app: routes, websockets, static files
