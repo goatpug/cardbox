@@ -62,28 +62,7 @@
         <h2>Add a custom card</h2>
         <button class="ghost icon" id="editor-close">✕</button>
       </div>
-      <div class="editor-tabs">
-        <button id="tab-white" class="active">White card</button>
-        <button id="tab-black">Black card</button>
-      </div>
-
-      <div id="editor-white">
-        <p class="muted">Write a noun or gerund — a thing or a doing. "A disappointing salad." "Crying at the gym."</p>
-        <textarea id="white-text" maxlength="80" rows="2" style="width:100%;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:0.7em;"></textarea>
-        <div class="char-count"><span id="white-count">0</span>/80</div>
-        <div class="preview-card"><div class="card white"><div class="card-text" id="white-preview"></div></div></div>
-        <button id="btn-add-white" class="big">Add white card</button>
-      </div>
-
-      <div id="editor-black" class="hidden">
-        <p class="muted">Fill-in-the-blank ("_ ruined Thanksgiving.") or a question ("What's my secret power?").</p>
-        <textarea id="black-text" maxlength="140" rows="2" style="width:100%;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:0.7em;"></textarea>
-        <div class="char-count"><span id="black-count">0</span>/140</div>
-        <div class="preview-card"><div class="card black"><div class="card-text" id="black-preview"></div></div></div>
-        <button id="btn-add-black" class="big">Add black card</button>
-      </div>
-
-      <div id="editor-error" class="hidden" style="color:var(--danger)"></div>
+      <div id="editor-root"></div>
     </div>
   </div>
 

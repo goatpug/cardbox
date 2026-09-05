@@ -154,3 +154,25 @@ def test_board_takeover_closes_old_socket():
                 assert err["code"] == "BOARD_TAKEN_OVER"
                 expect(board2, "joined")
                 expect(board2, "state")
+
+
+def test_add_card_over_http_outside_a_game():
+    with guard(10), TestClient(app) as client:
+        body = {"kind": "white", "text": "A cursed waffle iron.", "author": "Sharon"}
+        r = client.post("/api/library/cards", json=body)
+        assert r.status_code == 200
+        assert r.json()["is_new"] is True
+
+        # same text again: duplicate guard, reported honestly
+        r = client.post("/api/library/cards", json=body)
+        assert r.status_code == 200
+        assert r.json()["is_new"] is False
+
+        r = client.post("/api/library/cards", json={"kind": "black", "text": "No blank here.", "author": "Sharon"})
+        assert r.status_code == 400
+        r = client.post("/api/library/cards", json={"kind": "white", "text": "Anonymous bees.", "author": ""})
+        assert r.status_code == 400
+
+        cards = client.get("/api/library/packs/house/cards").json()
+        mine = [c for c in cards if c["text"] == "A cursed waffle iron."]
+        assert len(mine) == 1 and mine[0]["author"] == "Sharon"

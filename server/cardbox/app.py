@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -403,6 +403,11 @@ async def admin_page():
     return FileResponse(WEB_DIR / "admin.html")
 
 
+@app.get("/cards")
+async def cards_page():
+    return FileResponse(WEB_DIR / "cards.html")
+
+
 # ----------------------------------------------------------- library REST API
 # (Board-only, lobby-only per §5.6; not part of the §7.4 realtime protocol.)
 
@@ -429,6 +434,29 @@ async def api_pack_cards(pack_id: str):
         {"id": c.id, "kind": c.kind, "text": c.text, "author": c.author}
         for c in hub.library.list_pack_cards(pack_id)
     ]
+
+
+@app.post("/api/library/cards")
+async def api_add_card(request: Request):
+    """Add a House card outside any game (the /cards page). Same validation
+    and duplicate guard as the in-game add_card message; lands in the library
+    only — rooms already underway don't see it until their next game."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Body must be JSON"}, status_code=400)
+    if not isinstance(body, dict):
+        return JSONResponse({"error": "Body must be a JSON object"}, status_code=400)
+    author = str(body.get("author") or "").strip()
+    if not (1 <= len(author) <= 20):
+        return JSONResponse({"error": "Tell us your name (1-20 characters)."}, status_code=400)
+    try:
+        row, is_new = hub.library.add_card(
+            body.get("kind"), str(body.get("text") or ""), author=author, pack_id="house"
+        )
+    except (ValueError, InvalidBlackCard) as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    return {"id": row.id, "kind": row.kind, "text": row.text, "author": row.author, "is_new": is_new}
 
 
 @app.delete("/api/library/cards/{card_id}")

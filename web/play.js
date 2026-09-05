@@ -1,5 +1,6 @@
 import { GameSocket } from "/static/shared/ws.js";
 import { esc, hasBlanks, renderBlankTemplate, renderSubmission, composeSentence } from "/static/shared/cardview.js";
+import { wireEditor } from "/static/shared/cardeditor.js";
 
 const SESSION_KEY = "cardbox_session";
 
@@ -33,7 +34,7 @@ let pendingWinnerIndex = null;
 // Czar (or anyone) can tap a revealed submission to slot that one instead.
 let focusIndex = null;
 let seenRevealedCount = 0;
-let pendingAddCard = null;
+let pendingAddCard = null; // { kind, text, resolve } while an add_card is in flight
 
 function toast(text) {
   const host = document.getElementById("toast-host");
@@ -69,11 +70,9 @@ const socket = new GameSocket("/ws/play", {
 
 function handleError(data) {
   if (pendingAddCard) {
-    const target = pendingAddCard.kind === "white" ? "white" : "black";
+    const pending = pendingAddCard;
     pendingAddCard = null;
-    const err = document.getElementById("editor-error");
-    err.textContent = data.message;
-    err.classList.remove("hidden");
+    pending.resolve({ ok: false, message: data.message });
     return;
   }
   if (!session) {
@@ -384,56 +383,19 @@ const sheet = document.getElementById("editor-sheet");
 document.getElementById("btn-open-editor").addEventListener("click", () => sheet.classList.remove("hidden"));
 document.getElementById("editor-close").addEventListener("click", () => sheet.classList.add("hidden"));
 
-const tabWhite = document.getElementById("tab-white");
-const tabBlack = document.getElementById("tab-black");
-tabWhite.addEventListener("click", () => switchTab("white"));
-tabBlack.addEventListener("click", () => switchTab("black"));
-
-function switchTab(kind) {
-  tabWhite.classList.toggle("active", kind === "white");
-  tabBlack.classList.toggle("active", kind === "black");
-  document.getElementById("editor-white").classList.toggle("hidden", kind !== "white");
-  document.getElementById("editor-black").classList.toggle("hidden", kind !== "black");
-  document.getElementById("editor-error").classList.add("hidden");
-}
-
-const whiteText = document.getElementById("white-text");
-whiteText.addEventListener("input", () => {
-  document.getElementById("white-count").textContent = whiteText.value.length;
-  document.getElementById("white-preview").textContent = whiteText.value || "…";
+// The server only answers add_card with an error; silence for a beat means
+// it landed (§5.6). The shared editor handles tabs, preview and validation.
+wireEditor(document.getElementById("editor-root"), {
+  onSubmit: (kind, text) =>
+    new Promise((resolve) => {
+      pendingAddCard = { kind, text, resolve };
+      socket.send("add_card", { kind, text });
+      setTimeout(() => {
+        if (pendingAddCard && pendingAddCard.resolve === resolve) {
+          pendingAddCard = null;
+          toast("Card added!");
+          resolve({ ok: true });
+        }
+      }, 700);
+    }),
 });
-
-const blackText = document.getElementById("black-text");
-blackText.addEventListener("input", () => {
-  document.getElementById("black-count").textContent = blackText.value.length;
-  document.getElementById("black-preview").innerHTML = renderBlankTemplate(blackText.value || "…");
-});
-
-document.getElementById("btn-add-white").addEventListener("click", () => submitCard("white", whiteText));
-document.getElementById("btn-add-black").addEventListener("click", () => submitCard("black", blackText));
-
-function submitCard(kind, textEl) {
-  const text = textEl.value.trim();
-  const err = document.getElementById("editor-error");
-  err.classList.add("hidden");
-  if (!text) {
-    err.textContent = "Write something first.";
-    err.classList.remove("hidden");
-    return;
-  }
-  if (kind === "black" && !text.includes("_") && !text.trim().endsWith("?")) {
-    err.textContent = "Needs a blank ('_') or must end with '?'.";
-    err.classList.remove("hidden");
-    return;
-  }
-  pendingAddCard = { kind, text };
-  socket.send("add_card", { kind, text });
-  setTimeout(() => {
-    if (pendingAddCard && pendingAddCard.text === text) {
-      pendingAddCard = null;
-      textEl.value = "";
-      textEl.dispatchEvent(new Event("input"));
-      toast("Card added!");
-    }
-  }, 700);
-}

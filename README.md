@@ -27,6 +27,10 @@ Then:
    the QR code shown on the Board), enters the room code + their name.
 3. Arrange the Card Czar order and hit **Start game** from the Board.
 
+Anyone can also add cards to the House pack with no game running at
+`http://<host>:8420/cards` (linked from the landing page) — they show up in
+the next game anyone starts.
+
 `cardbox.db` (the persistent card library — starter packs + everyone's
 custom cards) and `snapshots/` (crash-recovery snapshots, §8.6) are created
 automatically on first run in the repo root, and are gitignored.

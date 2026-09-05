@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Cardbox — Add cards</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div id="toast-host"></div>
+  <div style="max-width:30em;margin:0 auto;padding:1.5em;display:flex;flex-direction:column;gap:1em;">
+    <div>
+      <h1>🃏 Add cards</h1>
+      <p class="muted">
+        No game needed. Anything you add goes straight into the House pack and
+        shows up in the next game anyone starts.
+      </p>
+    </div>
+
+    <div class="panel">
+      <label class="muted">Your name (shown next to your cards in the library)
+        <input id="author" type="text" maxlength="20" placeholder="Your name" style="width:100%;margin-top:0.4em" />
+      </label>
+    </div>
+
+    <div class="panel">
+      <div id="editor-root"></div>
+    </div>
+
+    <div class="panel hidden" id="added-panel">
+      <h2>Added this visit</h2>
+      <div id="added-list" class="library-list"></div>
+    </div>
+
+    <p class="muted center"><a href="/">← Back to Cardbox</a></p>
+  </div>
+
+  <script type="module" src="/static/cards.js"></script>
+</body>
+</html>
