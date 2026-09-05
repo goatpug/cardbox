@@ -14,16 +14,42 @@ export function hasBlanks(text) {
   return /_+/.test(text ?? "");
 }
 
+// White cards are written as standalone sentences ("Bees.", "A haunted
+// vibrator.") but get dropped into the middle of a black card's sentence, so
+// the text needs fitting: drop the trailing period unless the blank ends the
+// sentence, and lowercase the first letter unless the blank starts the
+// sentence. Words that carry their own capitals ("DMV", "OnlyFans", "I'm")
+// are left alone — a proper noun in first position is the one case this
+// heuristic misses, and the deck avoids them.
+export function fitFill(text, { atStart, atEnd }) {
+  let t = (text ?? "").trim();
+  if (!atEnd) t = t.replace(/\.$/, "");
+  if (!atStart) {
+    const first = t.split(/\s+/)[0] || "";
+    const keepsCase = first === "I" || /^I['’]/.test(first) || /[A-Z]/.test(first.slice(1));
+    if (!keepsCase) t = t.charAt(0).toLowerCase() + t.slice(1);
+  }
+  return t;
+}
+
 // Replaces the Nth blank with the Nth card of the submission, styled distinctly.
 // Only meaningful when hasBlanks(blackText) — see renderSubmission below.
 export function composeSentence(blackText, cards) {
   const parts = blackText.split(/(_+)/g);
   let idx = 0;
   let html = "";
-  for (const part of parts) {
+  for (let p = 0; p < parts.length; p++) {
+    const part = parts[p];
     if (/^_+$/.test(part)) {
       const c = cards[idx++];
-      html += `<span class="fill">${esc(c ? c.text : "___")}</span>`;
+      const before = parts.slice(0, p).join("");
+      const after = parts.slice(p + 1).join("");
+      // "Ends the sentence" means nothing but whitespace follows the blank —
+      // a black card that supplies its own period ("…marriage? _.") also
+      // wants the white card's period gone.
+      const atStart = /(^|[.!?]\s*)$/.test(before);
+      const atEnd = after.trim() === "";
+      html += `<span class="fill">${c ? esc(fitFill(c.text, { atStart, atEnd })) : "___"}</span>`;
     } else {
       html += esc(part);
     }

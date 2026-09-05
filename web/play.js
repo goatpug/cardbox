@@ -1,5 +1,5 @@
 import { GameSocket } from "/static/shared/ws.js";
-import { esc, renderBlankTemplate, renderSubmission } from "/static/shared/cardview.js";
+import { esc, hasBlanks, renderBlankTemplate, renderSubmission, composeSentence } from "/static/shared/cardview.js";
 
 const SESSION_KEY = "cardbox_session";
 
@@ -28,6 +28,11 @@ let state = null;
 let selected = []; // ordered card ids chosen this round, before confirm
 let lastSubmittedCards = []; // remembered locally to grey out after confirm (§5.5)
 let pendingWinnerIndex = null;
+// Reveal/judge view: which submission is currently slotted into the black
+// card at the top of the phone. Follows the newest flip automatically; the
+// Czar (or anyone) can tap a revealed submission to slot that one instead.
+let focusIndex = null;
+let seenRevealedCount = 0;
 let pendingAddCard = null;
 
 function toast(text) {
@@ -135,11 +140,28 @@ function render() {
   }
   document.getElementById("screen-kicked").classList.add("hidden");
 
-  const bc = state.black_card;
-  document.getElementById("header-black-text").innerHTML = bc ? renderBlankTemplate(bc.text) : "…";
-
   const you = state.you || {};
   const phase = state.phase;
+  const bc = state.black_card;
+  const showingSubmissions = phase === "REVEALING" || phase === "JUDGING";
+  if (!showingSubmissions) {
+    focusIndex = null;
+    seenRevealedCount = 0;
+  } else {
+    const revealedCount = (state.revealed || []).filter((e) => e.revealed).length;
+    if (revealedCount !== seenRevealedCount) {
+      seenRevealedCount = revealedCount;
+      focusIndex = lastIndex(state.revealed, (e) => e.revealed);
+    }
+  }
+  const focused = showingSubmissions && focusIndex !== null ? state.revealed[focusIndex] : null;
+  const headerCard = document.getElementById("header-black-text");
+  if (bc && focused?.revealed && hasBlanks(bc.text)) {
+    headerCard.innerHTML = composeSentence(bc.text, focused.cards);
+  } else {
+    headerCard.innerHTML = bc ? renderBlankTemplate(bc.text) : "…";
+  }
+
   document.getElementById("phase-status").textContent = statusText(phase, you);
 
   renderTimer();
@@ -162,10 +184,8 @@ function render() {
     area.innerHTML = `<p class="muted center" style="margin-top:2em">Waiting for the host to start the game…</p>`;
   } else if (phase === "SUBMITTING") {
     renderSubmitting(you, area, bar);
-  } else if (phase === "REVEALING") {
-    renderRevealing(you, area, bar);
-  } else if (phase === "JUDGING") {
-    renderJudging(you, area, bar);
+  } else if (phase === "REVEALING" || phase === "JUDGING") {
+    renderSubmissions(you, area, bar);
   } else if (phase === "ROUND_END") {
     renderRoundEnd(area);
   } else if (phase === "GAME_OVER") {
@@ -257,60 +277,63 @@ function renderSubmitting(you, area, bar) {
   };
 }
 
-function renderRevealing(you, area, bar) {
+function lastIndex(arr, pred) {
+  for (let i = (arr || []).length - 1; i >= 0; i--) if (pred(arr[i])) return i;
+  return null;
+}
+
+// REVEALING and JUDGING share one layout on the phone: the black card in the
+// sticky header shows the focused submission slotted into its blanks, and the
+// submissions themselves are listed below as plain white cards (one row per
+// submission, `pick` cards wide) — face-down until the Czar flips them.
+function renderSubmissions(you, area, bar) {
   const bc = state.black_card;
-  const grid = document.createElement("div");
-  grid.className = "hand-grid";
-  grid.style.gridTemplateColumns = "1fr";
+  const pick = bc?.pick ?? 1;
+  const judging = state.phase === "JUDGING";
+  const list = document.createElement("div");
+  list.className = "sub-list" + (pick === 1 ? " single" : "");
+  list.style.setProperty("--pick", pick);
+
   state.revealed.forEach((entry, i) => {
-    const card = document.createElement("div");
+    const row = document.createElement("div");
+    row.className = "sub-row";
     if (entry.revealed) {
-      const { className, html } = renderSubmission(bc.text, entry.cards);
-      card.className = className;
-      card.innerHTML = html;
+      if (i === focusIndex) row.classList.add("focused");
+      if (judging && pendingWinnerIndex === i) row.classList.add("selected");
+      for (const c of entry.cards) {
+        const card = document.createElement("div");
+        card.className = "card white";
+        card.innerHTML = `<div class="card-text">${esc(c.text)}</div>`;
+        row.appendChild(card);
+      }
+      row.addEventListener("click", () => {
+        focusIndex = i;
+        if (judging && you.can_judge) pendingWinnerIndex = i;
+        render();
+      });
     } else {
-      card.className = "card facedown";
+      for (let k = 0; k < pick; k++) {
+        const card = document.createElement("div");
+        card.className = "card facedown";
+        row.appendChild(card);
+      }
       if (you.is_czar && you.reveal_cursor === i) {
-        card.style.outline = "2px dashed var(--accent)";
-        card.style.cursor = "pointer";
-        card.addEventListener("click", () => socket.send("reveal_next", {}));
+        row.classList.add("next");
+        row.addEventListener("click", () => socket.send("reveal_next", {}));
       }
     }
-    grid.appendChild(card);
+    list.appendChild(row);
   });
-  area.appendChild(grid);
+  area.appendChild(list);
 
-  if (you.is_czar) {
+  if (!judging && you.is_czar) {
     bar.classList.remove("hidden");
-    document.getElementById("confirm-hint").textContent = "Tap the next card, or:";
+    document.getElementById("confirm-hint").textContent = "Tap the next face-down card, or:";
     const btn = document.getElementById("btn-confirm");
     btn.disabled = you.reveal_cursor === null || you.reveal_cursor === undefined;
     btn.textContent = "Flip next";
     btn.onclick = () => socket.send("reveal_next", {});
-  }
-}
-
-function renderJudging(you, area, bar) {
-  const bc = state.black_card;
-  const grid = document.createElement("div");
-  grid.className = "hand-grid";
-  grid.style.gridTemplateColumns = "1fr";
-  state.revealed.forEach((entry, i) => {
-    const card = document.createElement("div");
-    const { className, html } = renderSubmission(bc?.text || "", entry.cards);
-    card.className = className + (pendingWinnerIndex === i ? " selected" : "");
-    card.innerHTML = html;
-    if (you.can_judge) {
-      card.addEventListener("click", () => {
-        pendingWinnerIndex = i;
-        render();
-      });
-    }
-    grid.appendChild(card);
-  });
-  area.appendChild(grid);
-
-  if (you.can_judge) {
+  } else if (judging && you.can_judge) {
     bar.classList.remove("hidden");
     document.getElementById("confirm-hint").textContent =
       pendingWinnerIndex === null ? "Tap the funniest one" : "Confirm this winner?";

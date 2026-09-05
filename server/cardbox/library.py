@@ -75,9 +75,25 @@ class Library:
         self._conn.commit()
 
     def seed_pack_json(self, path: str | Path) -> None:
-        """Load a shipped JSON pack, insert-if-absent by pack id (§6.4)."""
+        """Sync a shipped JSON pack into the library (§6.4).
+
+        Cards in the file are inserted if absent. Shipped cards (author is
+        NULL) already in this pack but no longer in the file are soft-deleted,
+        so editing a pack's JSON retires the old wording on every existing
+        database, not just fresh ones. Player-authored cards are never touched
+        by this — they carry an author.
+        """
         pack = cardsmod.read_pack_json(path)
         self._ensure_pack(pack.id, pack.name, True)
+        keep = {cardsmod.normalize_text(t) for t in pack.white + pack.black}
+        cur = self._conn.execute(
+            "SELECT id, text FROM cards WHERE pack_id=? AND author IS NULL AND deleted=0",
+            (pack.id,),
+        )
+        for card_id, text in cur.fetchall():
+            if cardsmod.normalize_text(text) not in keep:
+                self._conn.execute("UPDATE cards SET deleted=1 WHERE id=?", (card_id,))
+        self._conn.commit()
         for text in pack.white:
             self.add_card("white", text, author=None, pack_id=pack.id)
         for text in pack.black:

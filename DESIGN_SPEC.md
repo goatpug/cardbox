@@ -321,6 +321,20 @@ BlackCard:  id, text, pick, pack_id
   submission is displayed *below* the question rather than inline.
 - Rendering rule for reveals: replace the Nth blank with the Nth card of the
   submission, styled distinctly (e.g. underlined/bold) on Board and phones.
+  White cards are standalone sentences ("Bees."), so when slotted in they are
+  fitted: trailing period dropped unless the blank ends the sentence, first
+  letter lowercased unless the blank starts one (words with their own
+  capitals — "DMV", "OnlyFans", "I'm" — are left alone).
+- Phone layout during reveal/judge: the black card in the sticky header shows
+  the *focused* submission slotted into its blanks (focus follows the newest
+  flip; tapping any revealed submission refocuses it), and the submissions
+  are listed below as plain white cards, one row per submission, `pick`
+  cards wide. The Board keeps the composed-sentence grid.
+- Black cards should read naturally with both noun-phrase and gerund-phrase
+  white cards ("Bees." and "Slapping a biscuit out of a toddler's hand.").
+  Avoid slots that demand one shape only — "I got _", "my _", "_ as the
+  survivors" — and prefer verbs like *tried*, *blamed*, *guilty of* that
+  take either.
 
 ### 6.3 Player and Submission
 

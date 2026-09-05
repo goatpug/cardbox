@@ -349,6 +349,24 @@ input::placeholder { color: var(--muted); }
 }
 .hand-grid .card { min-height: 6.5em; font-size: 1rem; cursor: pointer; }
 .hand-grid .card.submitted { opacity: 0.35; pointer-events: none; }
+/* Reveal/judge list on the phone: one row per submission, `pick` cards wide.
+   Single-pick rounds pack two submissions per line so the list stays short. */
+.sub-list { display: flex; flex-direction: column; gap: 0.8em; }
+.sub-list.single { display: grid; grid-template-columns: repeat(2, 1fr); }
+.sub-row {
+  display: grid;
+  grid-template-columns: repeat(var(--pick, 1), 1fr);
+  gap: 0.5em;
+  padding: 0.3em;
+  border-radius: calc(var(--radius) + 0.3em);
+  cursor: pointer;
+}
+.sub-row .card { min-height: 6.5em; font-size: 1rem; }
+.sub-row.focused { background: var(--surface-2); }
+.sub-row.selected { outline: 3px solid var(--accent); outline-offset: 0; }
+.sub-row.next { outline: 2px dashed var(--accent); outline-offset: 0; }
+.player-header .card.black .fill { color: #ffd166; }
+
 .hand-grid .card .pick-order {
   align-self: flex-end;
   background: var(--accent);

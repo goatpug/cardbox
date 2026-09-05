@@ -79,3 +79,20 @@ def test_json_pack_import_export_roundtrip(lib, tmp_path):
     # re-seeding the same file is insert-if-absent: no duplicate rows
     lib.seed_pack_json(pack_path)
     assert len(lib.list_pack_cards("mini")) == 4
+
+
+def test_reseeding_edited_pack_retires_removed_shipped_cards(lib, tmp_path):
+    pack_path = tmp_path / "mini.json"
+    pack_path.write_text(
+        json.dumps({"id": "mini", "name": "Mini", "white": ["Bees.", "Old wording."], "black": ["_ ruined it."]})
+    )
+    lib.seed_pack_json(pack_path)
+    # a player-authored card in the same pack must survive a re-seed
+    lib.add_card("white", "Player card.", author="Sharon", pack_id="mini")
+
+    pack_path.write_text(
+        json.dumps({"id": "mini", "name": "Mini", "white": ["Bees.", "New wording."], "black": ["_ ruined it."]})
+    )
+    lib.seed_pack_json(pack_path)
+    texts = {c.text for c in lib.list_pack_cards("mini")}
+    assert texts == {"Bees.", "New wording.", "_ ruined it.", "Player card."}
