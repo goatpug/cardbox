@@ -325,11 +325,13 @@ BlackCard:  id, text, pick, pack_id
   fitted: trailing period dropped unless the blank ends the sentence, first
   letter lowercased unless the blank starts one (words with their own
   capitals — "DMV", "OnlyFans", "I'm" — are left alone).
-- Phone layout during reveal/judge: the black card in the sticky header shows
-  the *focused* submission slotted into its blanks (focus follows the newest
-  flip; tapping any revealed submission refocuses it), and the submissions
-  are listed below as plain white cards, one row per submission, `pick`
-  cards wide. The Board keeps the composed-sentence grid.
+- Reveal/judge layout, Board and phones alike: the black card (big on the
+  Board, in the phone's sticky header) shows the *focused* submission slotted
+  into its blanks, and the submissions are listed below as plain white cards,
+  one row per submission, `pick` cards wide. The server tracks
+  `focused_index`: it follows the newest flip, and the Czar tapping a revealed
+  submission on their phone moves it for everyone (`focus_submission`). A
+  non-Czar tapping a submission refocuses their own phone only.
 - Black cards should read naturally with both noun-phrase and gerund-phrase
   white cards ("Bees." and "Slapping a biscuit out of a toddler's hand.").
   Avoid slots that demand one shape only — "I got _", "my _", "_ as the
@@ -468,6 +470,7 @@ Client → server (player phone):
 | `submit` | `{card_ids: […ordered]}` | SUBMITTING |
 | `reveal_next` | `{}` (Czar only) | REVEALING |
 | `pick_winner` | `{submission_index}` (Czar only) | JUDGING |
+| `focus_submission` | `{submission_index}` (Czar only; must be revealed) | REVEALING, JUDGING |
 | `add_card` | `{kind: "white"\|"black", text}` | any |
 | `ping` | `{}` | any |
 
@@ -487,7 +490,7 @@ Server → client:
 | type | data |
 |---|---|
 | `joined` | `{player_id, token, code}` (join/rejoin ack) |
-| `state` | full role-filtered snapshot: `{phase, round_no, black_card, players: [{name, score, connected, is_czar}], czar_order, submission_count, revealed: […], hand: […](players only), you: {…}, settings, winner: {name, cards}?}` |
+| `state` | full role-filtered snapshot: `{phase, round_no, black_card, players: [{name, score, connected, is_czar}], czar_order, submission_count, revealed: […], focused_index, hand: […](players only), you: {…}, settings, winner: {name, cards}?}` |
 | `toast` | `{text}` transient notices ("Dana added 2 custom cards") |
 | `error` | `{code, message}` e.g. `ROOM_NOT_FOUND`, `NAME_TAKEN` → resolved server-side, `BAD_PHASE`, `INVALID_CARD` |
 

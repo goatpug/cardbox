@@ -1,5 +1,5 @@
 import { GameSocket } from "/static/shared/ws.js";
-import { esc, renderBlankTemplate, renderSubmission } from "/static/shared/cardview.js";
+import { esc, hasBlanks, renderBlankTemplate, renderSubmission, composeSentence } from "/static/shared/cardview.js";
 
 const HAND_SIZE_OPTIONS = [5, 6, 7, 8, 9, 10];
 const SCORE_TARGET_OPTIONS = [3, 5, 7, 10, 15, 20, "endless"];
@@ -305,9 +305,21 @@ document.getElementById("btn-start-game").addEventListener("click", () => socket
 
 // --------------------------------------------------------------------- round
 
+// Same layout as the phone (§6.2): the big black card fills its blanks with
+// the focused submission — the newest flip, or whichever one the Czar tapped
+// on their phone — and the submissions sit below as plain white cards, one
+// row per submission, `pick` cards wide.
 function renderRound() {
   const bc = state.black_card;
-  document.getElementById("black-card-text").innerHTML = bc ? renderBlankTemplate(bc.text) : "";
+  const pick = bc?.pick ?? 1;
+  const focusIdx = state.focused_index;
+  const focused = focusIdx !== null && focusIdx !== undefined ? state.revealed?.[focusIdx] : null;
+  const bcText = document.getElementById("black-card-text");
+  if (bc && focused?.revealed && hasBlanks(bc.text)) {
+    bcText.innerHTML = composeSentence(bc.text, focused.cards);
+  } else {
+    bcText.innerHTML = bc ? renderBlankTemplate(bc.text) : "";
+  }
   document.getElementById("black-card-pick").textContent = bc ? bc.pick : "1";
 
   const dw = document.getElementById("deck-warning");
@@ -330,24 +342,35 @@ function renderRound() {
 
   const grid = document.getElementById("submission-grid");
   grid.innerHTML = "";
-  if (state.phase === "SUBMITTING") {
-    for (let i = 0; i < state.submission_count; i++) {
+  grid.style.setProperty("--pick", pick);
+  const facedownRow = () => {
+    const row = document.createElement("div");
+    row.className = "sub-row";
+    for (let k = 0; k < pick; k++) {
       const card = document.createElement("div");
       card.className = "card facedown";
-      grid.appendChild(card);
+      row.appendChild(card);
     }
+    return row;
+  };
+  if (state.phase === "SUBMITTING") {
+    for (let i = 0; i < state.submission_count; i++) grid.appendChild(facedownRow());
   } else {
-    for (const entry of state.revealed) {
-      const card = document.createElement("div");
-      if (entry.revealed) {
-        const { className, html } = renderSubmission(bc.text, entry.cards);
-        card.className = className;
-        card.innerHTML = html;
-      } else {
-        card.className = "card facedown";
+    state.revealed.forEach((entry, i) => {
+      if (!entry.revealed) {
+        grid.appendChild(facedownRow());
+        return;
       }
-      grid.appendChild(card);
-    }
+      const row = document.createElement("div");
+      row.className = "sub-row" + (i === focusIdx ? " focused" : "");
+      for (const c of entry.cards) {
+        const card = document.createElement("div");
+        card.className = "card white";
+        card.innerHTML = `<div class="card-text">${esc(c.text)}</div>`;
+        row.appendChild(card);
+      }
+      grid.appendChild(row);
+    });
   }
 
   const skipBtn = document.getElementById("btn-skip-czar");

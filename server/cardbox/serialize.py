@@ -73,6 +73,7 @@ def _base_snapshot(room: Room) -> dict:
         "czar_order": list(room.czar_order),
         "submission_count": len(room.submissions),
         "revealed": _revealed_list(room),
+        "focused_index": room.focused_index,
         "settings": _settings_dict(room.settings),
         "deck_warning": room.deck_warning,
         "winner": winner,

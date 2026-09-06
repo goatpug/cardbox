@@ -30,10 +30,12 @@ let selected = []; // ordered card ids chosen this round, before confirm
 let lastSubmittedCards = []; // remembered locally to grey out after confirm (§5.5)
 let pendingWinnerIndex = null;
 // Reveal/judge view: which submission is currently slotted into the black
-// card at the top of the phone. Follows the newest flip automatically; the
-// Czar (or anyone) can tap a revealed submission to slot that one instead.
+// card at the top of the phone. The server's focused_index follows the newest
+// flip and the Czar's taps (which the Board mirrors); a non-Czar tapping a
+// revealed submission refocuses their own phone only, until the shared focus
+// next moves.
 let focusIndex = null;
-let seenRevealedCount = 0;
+let seenFocusedIndex = null;
 let pendingAddCard = null; // { kind, text, resolve } while an add_card is in flight
 
 function toast(text) {
@@ -145,13 +147,10 @@ function render() {
   const showingSubmissions = phase === "REVEALING" || phase === "JUDGING";
   if (!showingSubmissions) {
     focusIndex = null;
-    seenRevealedCount = 0;
-  } else {
-    const revealedCount = (state.revealed || []).filter((e) => e.revealed).length;
-    if (revealedCount !== seenRevealedCount) {
-      seenRevealedCount = revealedCount;
-      focusIndex = lastIndex(state.revealed, (e) => e.revealed);
-    }
+    seenFocusedIndex = null;
+  } else if (state.focused_index !== seenFocusedIndex) {
+    seenFocusedIndex = state.focused_index;
+    focusIndex = state.focused_index;
   }
   const focused = showingSubmissions && focusIndex !== null ? state.revealed[focusIndex] : null;
   const headerCard = document.getElementById("header-black-text");
@@ -276,11 +275,6 @@ function renderSubmitting(you, area, bar) {
   };
 }
 
-function lastIndex(arr, pred) {
-  for (let i = (arr || []).length - 1; i >= 0; i--) if (pred(arr[i])) return i;
-  return null;
-}
-
 // REVEALING and JUDGING share one layout on the phone: the black card in the
 // sticky header shows the focused submission slotted into its blanks, and the
 // submissions themselves are listed below as plain white cards (one row per
@@ -308,6 +302,7 @@ function renderSubmissions(you, area, bar) {
       row.addEventListener("click", () => {
         focusIndex = i;
         if (judging && you.can_judge) pendingWinnerIndex = i;
+        if (you.is_czar) socket.send("focus_submission", { submission_index: i });
         render();
       });
     } else {

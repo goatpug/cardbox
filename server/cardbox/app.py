@@ -107,6 +107,7 @@ def room_to_dict(room: Room) -> dict:
             }
             for s in room.submissions
         ],
+        "focused_index": room.focused_index,
         "decks": {
             "white_draw": [_card_to_dict(c) for c in room.decks.white_draw],
             "white_discard": [_card_to_dict(c) for c in room.decks.white_discard],
@@ -163,6 +164,7 @@ def room_from_dict(data: dict) -> Room:
         )
         for sd in data["submissions"]
     ]
+    room.focused_index = data.get("focused_index")
     room.decks = Decks(
         white_draw=[_card_from_dict(c) for c in data["decks"]["white_draw"]],
         white_discard=[_card_from_dict(c) for c in data["decks"]["white_discard"]],
@@ -625,6 +627,11 @@ async def ws_play(websocket: WebSocket):
                     if not isinstance(idx, int):
                         raise ValueError("submission_index must be an integer")
                     room.pick_winner(player_id, idx)
+                elif mtype == "focus_submission":
+                    idx = data.get("submission_index")
+                    if not isinstance(idx, int):
+                        raise ValueError("submission_index must be an integer")
+                    room.focus_submission(player_id, idx)
                 elif mtype == "add_card":
                     kind = data.get("kind")
                     text = data.get("text") or ""

@@ -162,6 +162,35 @@ def test_reveal_next_only_czar():
         room.reveal_next(non_czar.id)
 
 
+def test_focus_follows_reveals_and_czar_taps():
+    room = make_room()
+    players = add_players(room, ["A", "B", "C"])
+    room.start_game()
+    submit_all_non_czar(room, players)
+    czar_id = room.current_czar_id
+    assert room.focused_index is None
+
+    room.reveal_next(czar_id)
+    assert room.focused_index == 0
+    with pytest.raises(NotAllowed):
+        room.focus_submission(czar_id, 1)  # not flipped yet
+    room.reveal_next(czar_id)
+    assert room.focused_index == 1
+    assert room.phase == Phase.JUDGING
+
+    room.focus_submission(czar_id, 0)
+    assert room.focused_index == 0
+    non_czar = next(p for p in players if p.id != czar_id)
+    with pytest.raises(NotAllowed):
+        room.focus_submission(non_czar.id, 1)
+    with pytest.raises(NotAllowed):
+        room.focus_submission(czar_id, 7)
+
+    room.pick_winner(czar_id, 1)
+    room.next_round()
+    assert room.focused_index is None
+
+
 def test_pick_winner_before_all_revealed_rejected():
     room = make_room()
     players = add_players(room, ["A", "B", "C"])

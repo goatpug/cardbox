@@ -136,6 +136,10 @@ class Room:
         self.round_no: int = 0
         self.black_card: BlackCard | None = None
         self.submissions: list[Submission] = []
+        # Index into `submissions` of the one currently slotted into the black
+        # card on the Board and phones: the newest flip, or whichever revealed
+        # submission the Czar last tapped (§6.2).
+        self.focused_index: int | None = None
         self.decks = Decks()
         self.board_connected: bool = False
         self.created_at = _now()
@@ -338,6 +342,7 @@ class Room:
     def _begin_round(self) -> None:
         self.black_card = self._draw_black()
         self.submissions = []
+        self.focused_index = None
         self.last_winner = None
         self.phase = Phase.SUBMITTING
         self.round_no += 1
@@ -395,8 +400,20 @@ class Room:
         if idx is None:
             raise NotAllowed("All submissions already revealed")
         self.submissions[idx].revealed = True
+        self.focused_index = idx
         if all(s.revealed for s in self.submissions):
             self.phase = Phase.JUDGING
+        self.last_activity = _now()
+
+    def focus_submission(self, czar_id: str, submission_index: int) -> None:
+        """Slot a revealed submission into the black card for everyone to see."""
+        self._require_phase(Phase.REVEALING, Phase.JUDGING)
+        self._require_czar(czar_id)
+        if not 0 <= submission_index < len(self.submissions):
+            raise NotAllowed("No such submission")
+        if not self.submissions[submission_index].revealed:
+            raise NotAllowed("That submission hasn't been revealed yet")
+        self.focused_index = submission_index
         self.last_activity = _now()
 
     def pick_winner(self, czar_id: str, submission_index: int) -> None:

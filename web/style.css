@@ -227,13 +227,16 @@ input::placeholder { color: var(--muted); }
   padding: 1.4em;
 }
 .black-card-display .card-text { font-size: 1.6rem; line-height: 1.35; }
+.black-card-display .card.black .fill { color: #ffd166; }
 
+/* One .sub-row per submission, `pick` cards wide (see the phone's .sub-row). */
 .submission-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--pick, 1) * 180px), 1fr));
   gap: 0.9em;
 }
 .submission-grid .card { min-height: 7em; font-size: 1.15rem; }
+.submission-grid .sub-row { cursor: default; }
 .submission-grid .card.winner { outline: 4px solid var(--success); }
 .submission-grid .winner-name {
   margin-top: 0.4em;
