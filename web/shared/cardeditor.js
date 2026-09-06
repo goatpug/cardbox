@@ -23,7 +23,7 @@ export function editorMarkup() {
     </div>
 
     <div id="editor-black" class="hidden">
-      <p class="muted">Fill-in-the-blank ("_ ruined Thanksgiving.") or a question ("What's my secret power?"). Make sure it reads with both a thing ("Bees.") and a doing ("Crying at the gym.") in the blank.</p>
+      <p class="muted">Fill-in-the-blank ("_ ruined Thanksgiving.") or a question ("What's my secret power?"). It needs to make sense with a thing ("Bees") OR an action ("Crying at the gym") in the blank.</p>
       <textarea id="black-text" maxlength="140" rows="2" style="${TEXTAREA_STYLE}"></textarea>
       <div class="char-count"><span id="black-count">0</span>/140</div>
       <div class="preview-card"><div class="card black"><div class="card-text" id="black-preview">…</div></div></div>
