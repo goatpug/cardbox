@@ -24,6 +24,7 @@
       </div>
       <div class="spacer"></div>
       <div id="round-badge" class="badge hidden">Round <span id="round-no">1</span></div>
+      <button id="btn-new-game-header" class="ghost hidden" title="End this game and go back to the lobby">New game</button>
     </header>
 
     <main class="board-main">
@@ -99,7 +100,11 @@
         <div class="panel center">
           <h2>🏆 Game over</h2>
           <div id="final-standings" class="scoreboard" style="max-width:24em;margin:0 auto"></div>
-          <button id="btn-rematch" style="margin-top:1em" class="big">Rematch</button>
+          <div class="row" style="justify-content:center;gap:0.75em;margin-top:1em">
+            <button id="btn-rematch" class="big">Rematch</button>
+            <button id="btn-new-game" class="big secondary">New game</button>
+          </div>
+          <p class="muted" style="font-size:0.85rem">Rematch: same everything, scores reset. New game: back to the lobby to change settings or players.</p>
         </div>
       </section>
     </main>

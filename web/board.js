@@ -71,6 +71,10 @@ function render() {
     document.getElementById(id).classList.add("hidden");
   }
   const roundBadge = document.getElementById("round-badge");
+  // Mid-game escape hatch; GAME_OVER has its own big button.
+  document
+    .getElementById("btn-new-game-header")
+    .classList.toggle("hidden", phase === "LOBBY" || phase === "GAME_OVER");
   if (phase === "LOBBY") {
     roundBadge.classList.add("hidden");
   } else {
@@ -409,3 +413,9 @@ function renderGameOver() {
 }
 
 document.getElementById("btn-rematch").addEventListener("click", () => socket.send("rematch", {}));
+document.getElementById("btn-new-game").addEventListener("click", () => socket.send("new_game", {}));
+document.getElementById("btn-new-game-header").addEventListener("click", () => {
+  if (confirm("End this game and go back to the lobby? Scores and hands will be wiped.")) {
+    socket.send("new_game", {});
+  }
+});

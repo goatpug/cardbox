@@ -429,3 +429,131 @@ def test_black_deck_reshuffles_discard():
     room.next_round()
     assert room.black_card is not None  # reshuffled the single discarded black card
     assert room.deck_warning is None or "black" not in (room.deck_warning or "")
+
+
+# ------------------------------------------------------- czar rotation sync
+
+def _play_round(room, players):
+    submit_all_non_czar(room, players)
+    while room.phase == Phase.REVEALING:
+        room.reveal_next(room.current_czar_id)
+    room.pick_winner(room.current_czar_id, 0)
+
+
+def test_lobby_reorder_before_last_join_still_rotates_everyone():
+    # Regression: host nudged the Czar order before the last friend joined,
+    # which froze the rotation and that friend was never Czar.
+    room = make_room()
+    room.settings.score_target = "endless"
+    a, b = add_players(room, ["A", "B"])
+    room.update_settings({"czar_order": [b.id, a.id]})
+    c = room.add_player("C")
+    room.start_game()
+    czars = []
+    for _ in range(3):
+        czars.append(room.current_czar_id)
+        _play_round(room, [a, b, c])
+        room.next_round()
+    assert czars == [b.id, a.id, c.id]
+
+
+def test_lobby_joiners_enter_rotation_immediately():
+    room = make_room()
+    a, b, c = add_players(room, ["A", "B", "C"])
+    assert room.czar_order == [a.id, b.id, c.id]
+
+
+def test_reorder_must_name_every_lobby_player():
+    room = make_room()
+    a, b, c = add_players(room, ["A", "B", "C"])
+    with pytest.raises(NotAllowed):
+        room.update_settings({"czar_order": [b.id, a.id]})
+
+
+def test_start_game_heals_stale_rotation_from_old_snapshot():
+    room = make_room()
+    a, b, c = add_players(room, ["A", "B", "C"])
+    room.czar_order = [b.id, a.id]  # shape of a pre-fix snapshot
+    room.start_game()
+    assert room.czar_order == [b.id, a.id, c.id]
+
+
+# ---------------------------------------------------------------- mulligan
+
+def test_mulligan_swaps_whole_hand_once_per_game():
+    room = make_room()
+    players = add_players(room, ["A", "B", "C"])
+    room.start_game()
+    p = players[1]
+    old_ids = {c.id for c in p.hand}
+    room.mulligan(p.id)
+    assert len(p.hand) == room.settings.hand_size
+    assert not old_ids & {c.id for c in p.hand}
+    assert old_ids <= {c.id for c in room.decks.white_discard}
+    with pytest.raises(NotAllowed):
+        room.mulligan(p.id)
+
+
+def test_mulligan_after_submitting_keeps_submission():
+    room = make_room()
+    a, b, c = add_players(room, ["A", "B", "C"])
+    room.start_game()
+    submitter = next(p for p in (a, b, c) if p.id != room.current_czar_id)
+    played = submitter.hand[0]
+    room.submit(submitter.id, [played.id])
+    room.mulligan(submitter.id)
+    assert len(submitter.hand) == room.settings.hand_size - 1
+    assert next(s for s in room.submissions if s.player_id == submitter.id).cards == [played]
+
+
+def test_mulligan_not_in_lobby():
+    room = make_room()
+    a, *_ = add_players(room, ["A", "B", "C"])
+    with pytest.raises(BadPhase):
+        room.mulligan(a.id)
+
+
+def test_mulligan_resets_on_rematch_and_new_game():
+    room = make_room()
+    room.settings.score_target = 3
+    players = add_players(room, ["A", "B", "C"])
+    room.start_game()
+    room.mulligan(players[0].id)
+    while room.phase != Phase.GAME_OVER:
+        _play_round(room, players)
+        if room.phase == Phase.ROUND_END:
+            room.next_round()
+    room.rematch()
+    room.mulligan(players[0].id)  # allowed again
+    room.new_game()
+    room.start_game()
+    room.mulligan(players[0].id)  # and again
+
+
+# ---------------------------------------------------------------- new game
+
+def test_new_game_mid_round_returns_to_clean_lobby():
+    room = make_room()
+    players = add_players(room, ["A", "B", "C"])
+    room.start_game()
+    _play_round(room, players)
+    room.next_round()
+    submit_all_non_czar(room, players)
+    room.new_game()
+    assert room.phase == Phase.LOBBY
+    assert room.round_no == 0
+    assert room.black_card is None and room.submissions == []
+    for p in players:
+        assert p.score == 0 and p.hand == [] and not p.mulligan_used
+    # every white card is back in the draw pile
+    assert len(room.decks.white_draw) == 100 and room.decks.white_discard == []
+    # late friend can join and the next game includes them
+    d = room.add_player("D")
+    room.start_game()
+    assert d.id in room.czar_order and len(d.hand) == room.settings.hand_size
+
+
+def test_new_game_rejected_in_lobby():
+    room = make_room()
+    with pytest.raises(BadPhase):
+        room.new_game()

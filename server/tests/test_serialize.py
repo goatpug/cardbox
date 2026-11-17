@@ -116,3 +116,13 @@ def test_czar_gets_reveal_cursor_and_judge_flag():
     room.reveal_next(czar_id)
     czar_snap = serialize_player(room, czar_id)
     assert czar_snap["you"]["can_judge"] is True
+
+
+def test_player_snapshot_reports_own_mulligan_only():
+    room = make_room()
+    a, b, c = add_players(room, ["Alice", "Bob", "Carol"])
+    room.start_game()
+    room.mulligan(a.id)
+    assert serialize_player(room, a.id)["you"]["mulligan_available"] is False
+    assert serialize_player(room, b.id)["you"]["mulligan_available"] is True
+    assert "mulligan" not in _blob(serialize_board(room))

@@ -175,8 +175,17 @@ out, and the export-to-JSON path (§6.4) doubles as the backup mechanism.
    card goes to the black discard pile; players draw back up to hand size;
    Czar advances to the next player in rotation. If the score target is
    reached → **Game over** screen (Board shows final standings; host can
-   start a rematch with the same players, decks and settings, scores reset).
+   start a rematch with the same players, decks and settings, scores reset,
+   or a **New game**, which returns everyone to the lobby with scores wiped
+   so settings, packs, players and Czar order can change). New game is also
+   available mid-game from the Board header, behind a confirm.
    Otherwise → next round.
+
+**Mulligan (🚽 flush).** Once per game, any player can flush their whole
+hand: every card in hand goes to the white discard and they draw the same
+number fresh (drawn before discarding, so a thin deck can't hand back the
+same cards). Allowed in any in-game phase; cards already submitted this
+round stay on the table. Resets on start, rematch and new game.
 
 ### 4.3 Player counts
 
@@ -472,6 +481,7 @@ Client → server (player phone):
 | `pick_winner` | `{submission_index}` (Czar only) | JUDGING |
 | `focus_submission` | `{submission_index}` (Czar only; must be revealed) | REVEALING, JUDGING |
 | `add_card` | `{kind: "white"\|"black", text}` | any |
+| `mulligan` | `{}` (once per game) | SUBMITTING, REVEALING, JUDGING, ROUND_END |
 | `ping` | `{}` | any |
 
 Client → server (Board):
@@ -483,6 +493,7 @@ Client → server (Board):
 | `start_game` | `{}` | LOBBY |
 | `next_round` | `{}` | ROUND_END (also auto-fires after 8s) |
 | `rematch` | `{}` | GAME_OVER |
+| `new_game` | `{}` (back to lobby, scores/hands/mulligans reset, pool re-derived) | any but LOBBY |
 | `kick_player` | `{player_id}` | LOBBY, ROUND_END |
 
 Server → client:

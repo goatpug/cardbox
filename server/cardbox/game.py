@@ -87,6 +87,7 @@ class Player:
     connected: bool = True
     is_playing: bool = True
     kicked: bool = False
+    mulligan_used: bool = False  # one 🚽 flush per game
 
 
 @dataclass
@@ -234,7 +235,10 @@ class Room:
         if mid_game:
             player.hand = self._draw_white(self.settings.hand_size)
             player.is_playing = False  # sits out the current round (§8.3)
-            self.czar_order.append(player.id)
+        # Everyone joins the rotation the moment they arrive, lobby included —
+        # otherwise a host who reorders the Czars before the last friend shows
+        # up freezes that friend out of ever being Czar.
+        self.czar_order.append(player.id)
         self.players.append(player)
         self.last_activity = _now()
         return player
@@ -316,9 +320,29 @@ class Room:
                 setattr(self.settings, key, data[key])
         self.last_activity = _now()
 
+    def _sync_czar_order(self) -> None:
+        """Make the rotation exactly the non-kicked players: keep the existing
+        order for those already in it, append anyone missing in join order.
+        Self-heals rooms restored from snapshots taken before every joiner was
+        added to the rotation."""
+        current = self.current_czar_id
+        live = [p.id for p in self.players if not p.kicked]
+        live_set = set(live)
+        order = [pid for pid in self.czar_order if pid in live_set]
+        seen = set(order)
+        order += [pid for pid in live if pid not in seen]
+        self.czar_order = order
+        if current in order:
+            self.czar_index = order.index(current)
+        elif order:
+            self.czar_index %= len(order)
+        else:
+            self.czar_index = 0
+
     def _reorder_czar(self, new_order: list[str]) -> None:
+        self._sync_czar_order()
         current = self.current_czar_id if self.round_no > 0 else None
-        if self.czar_order and set(new_order) != set(self.czar_order):
+        if set(new_order) != set(self.czar_order) or len(new_order) != len(self.czar_order):
             raise NotAllowed("czar_order must contain exactly the current rotation's players")
         self.czar_order = list(new_order)
         if current is not None and current in self.czar_order:
@@ -332,10 +356,11 @@ class Room:
         self._require_phase(Phase.LOBBY)
         if len(self._active_players()) < MIN_PLAYERS:
             raise NotAllowed(f"Need at least {MIN_PLAYERS} players")
-        if not self.czar_order:
-            self.czar_order = [p.id for p in self.players if not p.kicked]
+        self._sync_czar_order()
         self.czar_index = 0
         self.round_no = 0
+        for p in self.players:
+            p.mulligan_used = False
         self._deal_full_hands()
         self._begin_round()
 
@@ -465,13 +490,56 @@ class Room:
         self._require_phase(Phase.GAME_OVER)
         for p in self.players:
             p.score = 0
+            p.mulligan_used = False
             if not p.kicked:
                 p.is_playing = True
         self._rebuild_draw_piles()
+        self._sync_czar_order()
         self.czar_index = 0
         self.round_no = 0
         self._deal_full_hands()
         self._begin_round()
+
+    def new_game(self) -> None:
+        """Host tool: abandon whatever's happening and go back to the lobby
+        with scores, hands and mulligans wiped, so the group can change
+        settings, packs, Czar order or players before starting fresh. The
+        caller re-derives the card pool (new House cards land here)."""
+        if self.phase == Phase.LOBBY:
+            raise BadPhase("Already in the lobby")
+        for p in self.players:
+            p.score = 0
+            p.hand = []
+            p.mulligan_used = False
+            if not p.kicked:
+                p.is_playing = True
+        self.black_card = None
+        self.submissions = []
+        self.focused_index = None
+        self.last_winner = None
+        self.round_no = 0
+        self.czar_index = 0
+        self._sync_czar_order()
+        self._rebuild_draw_piles()
+        self.phase = Phase.LOBBY
+        self.last_activity = _now()
+
+    def mulligan(self, player_id: str) -> None:
+        """🚽 Flush your hand for a fresh one, once per game. Cards already
+        submitted this round stay on the table; only what's in hand goes."""
+        self._require_phase(Phase.SUBMITTING, Phase.REVEALING, Phase.JUDGING, Phase.ROUND_END)
+        player = self.get_player(player_id)
+        if player.kicked:
+            raise NotAllowed("Not in this game")
+        if player.mulligan_used:
+            raise NotAllowed("You already flushed your hand this game")
+        old = player.hand
+        # Draw before discarding so a near-empty deck can't hand you your own
+        # flushed cards straight back.
+        player.hand = self._draw_white(len(old))
+        self.decks.white_discard.extend(old)
+        player.mulligan_used = True
+        self.last_activity = _now()
 
     def skip_czar(self) -> None:
         """Host tool (timeout or discretion) abandoning a round the Czar can't finish (§8.2)."""

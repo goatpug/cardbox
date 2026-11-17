@@ -173,6 +173,8 @@ function render() {
   }
   if (phase !== "JUDGING") pendingWinnerIndex = null;
 
+  renderFlushButton(you, phase);
+
   const area = document.getElementById("hand-area");
   const bar = document.getElementById("confirm-bar");
   area.innerHTML = "";
@@ -190,6 +192,35 @@ function render() {
     renderGameOver(area);
   }
 }
+
+// 🚽 Mulligan: once per game, swap your whole hand for fresh cards.
+const IN_GAME = new Set(["SUBMITTING", "REVEALING", "JUDGING", "ROUND_END"]);
+let flushing = false;
+
+function renderFlushButton(you, phase) {
+  const btn = document.getElementById("btn-flush");
+  const show = IN_GAME.has(phase) && you.mulligan_available && (state.hand || []).length > 0;
+  btn.classList.toggle("hidden", !show);
+  btn.disabled = flushing;
+}
+
+document.getElementById("btn-flush").addEventListener("click", () => {
+  if (flushing) return;
+  if (!confirm("Flush your whole hand for a fresh one? You only get one flush per game.")) return;
+  flushing = true;
+  selected = [];
+  const cards = document.querySelectorAll("#hand-area .hand-grid .card.white:not(.submitted)");
+  cards.forEach((c, i) => {
+    c.style.animationDelay = `${i * 40}ms`;
+    c.classList.add("flushing");
+  });
+  // Let the swirl play before the fresh hand lands.
+  setTimeout(() => {
+    flushing = false;
+    socket.send("mulligan", {});
+    toast("🚽 Flushed! Fresh hand incoming.");
+  }, cards.length ? 650 : 0);
+});
 
 function statusText(phase, you) {
   if (phase === "LOBBY") return "Lobby";
@@ -358,7 +389,7 @@ function renderRoundEnd(area) {
 function renderGameOver(area) {
   const sorted = [...state.players].filter((p) => !p.kicked).sort((a, b) => b.score - a.score);
   const winner = sorted[0];
-  area.innerHTML = `<div class="full-screen-msg"><h2>🏆 ${winner ? esc(winner.name) + " wins!" : "Game over"}</h2><p class="muted">Ask the host to start a rematch from the Board.</p></div>`;
+  area.innerHTML = `<div class="full-screen-msg"><h2>🏆 ${winner ? esc(winner.name) + " wins!" : "Game over"}</h2><p class="muted">Ask the host to start a rematch or a new game from the Board.</p></div>`;
   const board = document.createElement("div");
   board.className = "scoreboard";
   board.style.maxWidth = "20em";

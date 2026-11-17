@@ -452,4 +452,25 @@ input::placeholder { color: var(--muted); }
   font-size: 0.85rem;
 }
 .timer-pill.flash { animation: flash 0.6s ease infinite alternate; }
+.fab.flush {
+  right: auto;
+  left: 1em;
+  font-size: 1.5rem;
+  padding: 0.45em 0.6em;
+  line-height: 1;
+}
+
+.card.flushing {
+  animation: flush-swirl 0.6s ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes flush-swirl {
+  to { transform: translateY(40vh) rotate(540deg) scale(0.05); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card.flushing { animation: none; opacity: 0.3; }
+}
+
 @keyframes flash { from { background: var(--surface-2); } to { background: var(--danger); } }

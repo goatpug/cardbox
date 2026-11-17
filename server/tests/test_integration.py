@@ -124,7 +124,25 @@ def test_full_round_over_the_wire():
 
                 # custom card: written to the library immediately (§5.6)
                 p1.send_json({"type": "add_card", "data": {"kind": "white", "text": "A haunted Roomba."}})
-                drain_state(sockets)
+                states = drain_state(sockets)
+
+                # 🚽 mulligan: fresh hand, once per game
+                before = {c["id"] for c in states["p1"]["hand"]}
+                assert states["p1"]["you"]["mulligan_available"] is True
+                p1.send_json({"type": "mulligan", "data": {}})
+                states = drain_state(sockets)
+                assert states["p1"]["you"]["mulligan_available"] is False
+                assert not before & {c["id"] for c in states["p1"]["hand"]}
+                p1.send_json({"type": "mulligan", "data": {}})
+                assert expect(p1, "error")["code"] == "NOT_ALLOWED"
+
+                # New game from the Board: back to a clean lobby
+                board.send_json({"type": "new_game", "data": {}})
+                states = drain_state(sockets)
+                assert all(s["phase"] == "LOBBY" for s in states.values())
+                assert all(p["score"] == 0 for p in states["board"]["players"])
+                assert states["p1"]["hand"] == []
+                assert states["p1"]["you"]["mulligan_available"] is True
 
         resp = client.get("/api/library/packs/house/cards")
         assert resp.status_code == 200

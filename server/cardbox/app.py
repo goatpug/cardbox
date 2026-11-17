@@ -92,6 +92,7 @@ def room_to_dict(room: Room) -> dict:
                 "score": p.score,
                 "is_playing": p.is_playing,
                 "kicked": p.kicked,
+                "mulligan_used": p.mulligan_used,
             }
             for p in room.players
         ],
@@ -149,6 +150,7 @@ def room_from_dict(data: dict) -> Room:
             connected=False,
             is_playing=p["is_playing"],
             kicked=p["kicked"],
+            mulligan_used=p.get("mulligan_used", False),
         )
         for p in data["players"]
     ]
@@ -531,6 +533,9 @@ async def ws_board(websocket: WebSocket, code: str):
                     room.next_round()
                 elif mtype == "rematch":
                     room.rematch()
+                elif mtype == "new_game":
+                    room.new_game()
+                    hub.refresh_pool(room)  # pick up House cards added since
                 elif mtype == "kick_player":
                     pid = data.get("player_id")
                     room.kick_player(pid)
@@ -627,6 +632,8 @@ async def ws_play(websocket: WebSocket):
                     if not isinstance(idx, int):
                         raise ValueError("submission_index must be an integer")
                     room.pick_winner(player_id, idx)
+                elif mtype == "mulligan":
+                    room.mulligan(player_id)
                 elif mtype == "focus_submission":
                     idx = data.get("submission_index")
                     if not isinstance(idx, int):

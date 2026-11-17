@@ -99,6 +99,7 @@ def serialize_player(room: Room, player_id: str) -> dict:
         "name": player.name,
         "is_czar": is_czar,
         "has_submitted": has_submitted,
+        "mulligan_available": not player.mulligan_used,
     }
     if is_czar and room.phase == Phase.REVEALING:
         you["reveal_cursor"] = next(
